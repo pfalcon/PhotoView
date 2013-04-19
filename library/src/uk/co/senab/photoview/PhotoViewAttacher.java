@@ -22,6 +22,7 @@ import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.GestureDetector;
+import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnLongClickListener;
@@ -32,7 +33,8 @@ import android.widget.ImageView.ScaleType;
 import java.lang.ref.WeakReference;
 
 public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener, VersionedGestureDetector.OnGestureListener,
-		GestureDetector.OnDoubleTapListener, ViewTreeObserver.OnGlobalLayoutListener {
+		GestureDetector.OnDoubleTapListener, View.OnGenericMotionListener,
+		ViewTreeObserver.OnGlobalLayoutListener {
 
 	static final String LOG_TAG = "PhotoViewAttacher";
 
@@ -134,6 +136,7 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener, Vers
 		mImageView = new WeakReference<ImageView>(imageView);
 
 		imageView.setOnTouchListener(this);
+		imageView.setOnGenericMotionListener(this);
 
 		mViewTreeObserver = imageView.getViewTreeObserver();
 		mViewTreeObserver.addOnGlobalLayoutListener(this);
@@ -418,6 +421,31 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener, Vers
 		}
 
 		return handled;
+	}
+
+	@Override
+	public boolean onGenericMotion(View v, MotionEvent ev) {
+		if (mZoomEnabled) {
+			if ((ev.getSource() & InputDevice.SOURCE_CLASS_POINTER) != 0) {
+				switch (ev.getAction()) {
+				case MotionEvent.ACTION_SCROLL:
+					// Process the mouse scroll wheel movement
+					float scale = getScale();
+					float newScale;
+					float x = ev.getX();
+					float y = ev.getY();
+					Log.d("PhotoView", "AXIS_VSCROLL: " + new Float(ev.getAxisValue(MotionEvent.AXIS_VSCROLL)).toString());
+					if (ev.getAxisValue(MotionEvent.AXIS_VSCROLL) > 0)
+						newScale = scale * 1.05f;
+					else
+						newScale = scale / 1.05f;
+					if (newScale > mMinScale)
+						zoomTo(newScale, x, y);
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
     @Override
