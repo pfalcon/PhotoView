@@ -423,6 +423,8 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener, Vers
 		return handled;
 	}
 
+	private float max_vscroll = 1.0f;
+	private float min_vscroll = -1.0f;
 	@Override
 	public boolean onGenericMotion(View v, MotionEvent ev) {
 		if (mZoomEnabled) {
@@ -434,13 +436,29 @@ public class PhotoViewAttacher implements IPhotoView, View.OnTouchListener, Vers
 					float newScale;
 					float x = ev.getX();
 					float y = ev.getY();
-					Log.d("PhotoView", "AXIS_VSCROLL: " + new Float(ev.getAxisValue(MotionEvent.AXIS_VSCROLL)).toString());
-					if (ev.getAxisValue(MotionEvent.AXIS_VSCROLL) > 0)
-						newScale = scale * 1.05f;
-					else
-						newScale = scale / 1.05f;
-					if (newScale > mMinScale)
-						zoomTo(newScale, x, y);
+					// API docs say AXIS_VSCROLL range is [-1.0; 1.0], and even getMotionRange()
+					// on a particualr device says the same, but on the same device, I've seen
+					// range [-4.0; 4.0], and actually values of -8.0 & 8.0 for fast motions too
+					// (no values betteen 4.0 & 8.0)
+					// So, let's be adaptive and record max range we saw ourselves
+					float vscroll = ev.getAxisValue(MotionEvent.AXIS_VSCROLL);
+					Log.d("PhotoView", "AXIS_VSCROLL: " + new Float(vscroll).toString());
+					if (vscroll > 0) {
+						if (vscroll > max_vscroll)
+							max_vscroll = vscroll;
+						// Assume max_vscroll == zoom by 33%, this gives good enough
+						// behavior in my tests
+						float factor = vscroll / max_vscroll * 0.33f + 1.0f;
+						newScale = scale * factor;
+					} else {
+						if (vscroll < min_vscroll)
+							min_vscroll = vscroll;
+						float factor = vscroll / min_vscroll * 0.33f + 1.0f;
+						newScale = scale / factor;
+					}
+					if (newScale < mMinScale)
+						newScale = mMinScale;
+					zoomTo(newScale, x, y);
 					return true;
 				}
 			}
